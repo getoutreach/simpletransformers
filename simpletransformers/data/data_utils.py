@@ -7,6 +7,7 @@ import json
 import pandas as pd
 from simpletransformers.data.url_vocab import UrlVocab
 
+
 PLATFORM = platform.system()
 if PLATFORM != 'Darwin':
     sts_client = boto3.client('sts', region_name='us-west-2')
@@ -15,7 +16,6 @@ if PLATFORM != 'Darwin':
 
 def get_resource():
     return boto3.resource('s3', region_name='us-west-2')
-
 
 
 def get_csv(s3, bucket, file_path):
@@ -32,17 +32,12 @@ def get_outreach_session(sts_client):
     """Specifically for writing data from Databricks to S3."""
     assumed_role_object = sts_client.assume_role(
         RoleArn="arn:aws:iam::182192988802:role/data-science-databricks-assume-role",
-        RoleSessionName="AssumeRoleSession1"
-    )
-
+        RoleSessionName="AssumeRoleSession1")
     credentials = assumed_role_object['Credentials']
-
     outreach_session = session.Session(aws_access_key_id=credentials['AccessKeyId'],
                                        aws_secret_access_key=credentials['SecretAccessKey'],
                                        aws_session_token=credentials['SessionToken'])
-
     print(outreach_session._session._register_credential_provider)
-
     return outreach_session
 
 
@@ -158,7 +153,7 @@ def get_feature_connectivity(url, urlvocab):
 
 
 def get_feature_node2vec(url, urlvocab):
-    return urlvocab.
+    return urlvocab.url2node2vec(url).tolist()
 
 
 def load_url_data_with_neighbouring_info(datafolder, urlvocab, onlytitle=False, addfeatures='connectivity'):
@@ -228,8 +223,5 @@ def load_url_data_with_neighbouring_info(datafolder, urlvocab, onlytitle=False, 
 if __name__ == '__main__':
     file_path = os.path.join('jie-faq', 'faq', 'outreach_support_url_meta.json')
     urlvocab = load_url_vocab(file_path)
-<<<<<<< Updated upstream
-=======
 
->>>>>>> Stashed changes
 
