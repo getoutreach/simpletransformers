@@ -137,7 +137,7 @@ class UrlVocab:
 
     def url2node2vec(self, url):
         if url in self.url_vocab_list:
-            return self.url_embedding[self.url_to_idx(url)]
+            return self.url_embedding[self.url_to_idx[url]]
         if url in self.nav_url_list:
-            return self.nav_url_embedding[self.nav_url_to_idx(url)]
+            return self.nav_url_embedding[self.nav_url_to_idx[url]]
         return None

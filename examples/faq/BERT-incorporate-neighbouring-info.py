@@ -35,7 +35,8 @@ print('Number of recommendation candidate URLs: %d' % urlvocab.vocab_size)
 
 # Load dataset for training and testing from S3.
 datafolder = os.path.join('jie-faq', 'faq', 'outreach_msgs_w_support_url_random_split')
-df_train, df_dev, df_test = load_url_data_with_neighbouring_info(datafolder, urlvocab)
+df_train, df_dev, df_test = load_url_data_with_neighbouring_info(datafolder, urlvocab,
+                                                                 addfeatures='node2vec')
 print(f'Dataset size: train={len(df_train)}/{urlvocab.vocab_size}={len(df_train) / urlvocab.vocab_size}, ' +
       f'dev={len(df_dev)}/{urlvocab.vocab_size}={len(df_dev) / urlvocab.vocab_size}, ' +
       f'test={len(df_test)}/{urlvocab.vocab_size}={len(df_test) / urlvocab.vocab_size}')

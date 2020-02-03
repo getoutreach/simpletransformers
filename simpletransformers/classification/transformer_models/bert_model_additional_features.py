@@ -65,10 +65,8 @@ class BertForSequenceClassificationAddFeatures(BertPreTrainedModel):
         # Complains if input_embeds is kept
 
         pooled_output = outputs[1]
-
-        pooled_output = self.dropout(pooled_output)
         pooled_output = torch.cat([pooled_output, addfeatures], dim=1)
-
+        pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
 
         outputs = (logits,) + outputs[
