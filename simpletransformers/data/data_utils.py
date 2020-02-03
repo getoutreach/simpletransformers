@@ -153,12 +153,22 @@ def load_url_data_email_article_pair(datafolder, urlvocab, onlytitle=False):
     return df_train, df_dev, df_test
 
 
-def load_url_data_with_neighbouring_info(datafolder, urlvocab, onlytitle=False):
+def get_feature_connectivity(url, urlvocab):
+    return urlvocab.url2nav(url) + urlvocab.url2outconn(url) + urlvocab.url2inconn(url)
+
+
+def get_feature_node2vec(url, urlvocab):
+    return urlvocab.
+
+
+def load_url_data_with_neighbouring_info(datafolder, urlvocab, onlytitle=False, addfeatures='connectivity'):
     '''
     Getting URL prediction datasets. "text_a" field contains input emails and "text_b" field contains the article
     associated with the candidate URL.
     :param datafolder:
     :param urlvocab:
+    :param onlytitle:
+    :param addfeatures:
     :return:
     '''
     def get_split(datafolder, split):
@@ -199,8 +209,13 @@ def load_url_data_with_neighbouring_info(datafolder, urlvocab, onlytitle=False):
 
         # Get connectivity information as additional features
         # FIXME: another option is to load this URL-related data during model training
-        df_expand_label['addfeatures'] = df_expand_label['url'].apply(
-            lambda x: urlvocab.url2nav(x) + urlvocab.url2outconn(x) + urlvocab.url2inconn(x))
+        if addfeatures == 'connectivity':
+            df_expand_label['addfeatures'] = df_expand_label['url'].apply(
+                lambda x: get_feature_connectivity(x, urlvocab))
+        elif addfeatures == 'node2vec':
+            df_expand_label['addfeatures'] = df_expand_label['url'].apply(
+                lambda x: get_feature_node2vec(x, urlvocab))
+
 
         return df_expand_label
 
@@ -213,4 +228,8 @@ def load_url_data_with_neighbouring_info(datafolder, urlvocab, onlytitle=False):
 if __name__ == '__main__':
     file_path = os.path.join('jie-faq', 'faq', 'outreach_support_url_meta.json')
     urlvocab = load_url_vocab(file_path)
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
 
