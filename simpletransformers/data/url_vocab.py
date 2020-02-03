@@ -134,3 +134,10 @@ class UrlVocab:
             return None
         return [1 if x in nav_urls else 0
                 for x in self.nav_url_list]
+
+    def url2node2vec(self, url):
+        if url in self.url_vocab_list:
+            return self.url_embedding[self.url_to_idx(url)]
+        if url in self.nav_url_list:
+            return self.nav_url_embedding[self.nav_url_to_idx(url)]
+        return None
