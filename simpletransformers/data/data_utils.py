@@ -213,4 +213,5 @@ def load_url_data_with_neighbouring_info(datafolder, urlvocab, onlytitle=False):
 if __name__ == '__main__':
     file_path = os.path.join('jie-faq', 'faq', 'outreach_support_url_meta.json')
     urlvocab = load_url_vocab(file_path)
+    
 
