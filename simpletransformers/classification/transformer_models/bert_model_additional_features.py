@@ -53,6 +53,7 @@ class BertForSequenceClassificationAddFeatures(BertPreTrainedModel):
         inputs_embeds=None,
         labels=None,
         addfeatures=None,
+        dropout_addfeatures=False
     ):
 
         outputs = self.bert(
@@ -65,8 +66,13 @@ class BertForSequenceClassificationAddFeatures(BertPreTrainedModel):
         # Complains if input_embeds is kept
 
         pooled_output = outputs[1]
-        pooled_output = torch.cat([pooled_output, addfeatures], dim=1)
-        pooled_output = self.dropout(pooled_output)
+        if dropout_addfeatures:
+            pooled_output = torch.cat([pooled_output, addfeatures], dim=1)
+            pooled_output = self.dropout(pooled_output)
+        else:
+            pooled_output = self.dropout(pooled_output)
+            pooled_output = torch.cat([pooled_output, addfeatures], dim=1)
+
         logits = self.classifier(pooled_output)
 
         outputs = (logits,) + outputs[
