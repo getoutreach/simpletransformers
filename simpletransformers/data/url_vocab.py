@@ -42,7 +42,7 @@ class UrlVocab:
         self.all_connectivity = self._find_all_connectivity()
 
         # Embed structural information
-        self.url_embedding, self.nav_url_embedding = None, None
+        self.url_node2vec_embedding, self.nav_url_node2vec_embedding = None, None
         if node2vec_encode:
             self.url_node2vec_embedding, self.nav_url_node2vec_embedding = self._node2vec_encode()
 
