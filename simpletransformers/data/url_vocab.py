@@ -44,13 +44,14 @@ class UrlVocab:
         # Embed structural information
         self.url_embedding, self.nav_url_embedding = None, None
         if node2vec_encode:
-            self.url_embedding, self.nav_url_embedding = self._node2vec_encode()
+            self.url_node2vec_embedding, self.nav_url_node2vec_embedding = self._node2vec_encode()
 
         # Embed using BERT
-        self.bert_embedding = None
+        self.bert_embedding, self.url_bert_embedding = None, None
         self.bert_embedding_filename = bert_embedding_filename
         if bert_encode and bert_embedding_filename is not None:
-            self.bert_embedding = self._get_bert_encoding(self.bert_embedding_filename)
+            self.bert_embedding = self._get_bert_encoding_of_url_text(self.bert_embedding_filename)
+            self.url_bert_embedding = self._bert_encode()
 
 
     def _find_url_connectivity(self):
@@ -152,12 +153,29 @@ class UrlVocab:
 
     def url2node2vec(self, url):
         if url in self.url_vocab_list:
-            return self.url_embedding[self.url_to_idx[url]]
+            return self.url_node2vec_embedding[self.url_to_idx[url]]
         if url in self.nav_url_list:
-            return self.nav_url_embedding[self.nav_url_to_idx[url]]
+            return self.nav_url_node2vec_embedding[self.nav_url_to_idx[url]]
         return None
 
-    def _get_bert_encoding(self, filename):
+    def url2bert(self, url):
+        if url in self.url_vocab_list:
+            return self.url_bert_embedding[self.url_to_idx[url]]
+        return None
+
+    def _bert_encode(self):
+        x = np.matmul(self.out_connectivity, self.bert_embedding)
+        y = np.sum(self.out_connectivity, axis=1, keepdims=True)
+        outembed = np.divide(x, y, out=np.zeros_like(x), where=y!=0)
+
+        x = np.matmul(self.in_connectivity, self.bert_embedding)
+        y = np.sum(self.in_connectivity, axis=1, keepdims=True)
+        inembed = np.divide(x, y, out=np.zeros_like(x), where=y!=0)
+
+        embed = np.concatenate([outembed, inembed], axis=1)
+        return embed
+
+    def _get_bert_encoding_of_url_text(self, filename):
         if os.path.exists(filename):
             print(f'Loading bert encoding from {filename}.')
             with open(filename, 'rb') as f:
@@ -165,19 +183,19 @@ class UrlVocab:
                 assert bert_embedding.shape[0] == self.vocab_size
         else:
             print(f'BERT encoding not found, generating.')
-            bert_embedding = self._bert_encode()
+            bert_embedding = self._bert_encode_text()
             with open(filename, 'wb') as f:
                 pickle.dump(bert_embedding, f, protocol=pickle.HIGHEST_PROTOCOL)
                 print(f'Saved BERT encoding to {filename}')
         return bert_embedding
 
-    def _bert_encode(self,
-                     max_seq_length=128,
-                     sequence_a_segment_id=0,
-                     sequence_b_segment_id=1,
-                     cls_token_segment_id=1,
-                     pad_token_segment_id=0,
-                     mask_padding_with_zero=True):
+    def _bert_encode_text(self,
+                          max_seq_length=128,
+                          sequence_a_segment_id=0,
+                          sequence_b_segment_id=1,
+                          cls_token_segment_id=1,
+                          pad_token_segment_id=0,
+                          mask_padding_with_zero=True):
 
         tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
         bert_config = BertConfig.from_pretrained('bert-base-uncased')

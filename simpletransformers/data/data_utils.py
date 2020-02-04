@@ -157,14 +157,10 @@ def get_feature_connectivity(url, urlvocab):
 def get_feature_node2vec(url, urlvocab):
     return urlvocab.url2node2vec(url).tolist()
 
+
 def get_feature_bert(url, urlvocab):
-    idx = urlvocab.url_to_idx(url)
-    outconn = urlvocab.out_connectivity[[idx]]
-    inconn = urlvocab.in_connectivity[[idx]]
-    outembed = (np.matmul(outconn, urlvocab.bert_embedding) / np.sum(outconn)).squeeze().tolist()
-    inembed = (np.matmul(outconn, urlvocab.bert_embedding) / np.sum(inconn)).squeeze().tolist()
-    embed = outembed + inembed
-    return embed
+    return urlvocab.url2bert(url).tolist()
+
 
 def load_url_data_with_neighbouring_info(datafolder, urlvocab, onlytitle=False, addfeatures='connectivity'):
     '''
