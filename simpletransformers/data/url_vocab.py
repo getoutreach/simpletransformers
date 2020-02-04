@@ -161,7 +161,7 @@ class UrlVocab:
         if os.path.exists(filename):
             print(f'Loading bert encoding from {filename}.')
             with open(filename, 'rb') as f:
-                bert_embedding = pickle.loads(f)
+                bert_embedding = pickle.load(f)
                 assert bert_embedding.shape[0] == self.vocab_size
         else:
             print(f'BERT encoding not found, generating.')

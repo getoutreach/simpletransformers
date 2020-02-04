@@ -5,6 +5,7 @@ import os
 import platform
 import json
 import pandas as pd
+import numpy as np
 from simpletransformers.data.url_vocab import UrlVocab
 
 
@@ -156,6 +157,14 @@ def get_feature_connectivity(url, urlvocab):
 def get_feature_node2vec(url, urlvocab):
     return urlvocab.url2node2vec(url).tolist()
 
+def get_feature_bert(url, urlvocab):
+    idx = urlvocab.url_to_idx(url)
+    outconn = urlvocab.out_connectivity[[idx]]
+    inconn = urlvocab.in_connectivity[[idx]]
+    outembed = (np.matmul(outconn, urlvocab.bert_embedding) / np.sum(outconn)).squeeze().tolist()
+    inembed = (np.matmul(outconn, urlvocab.bert_embedding) / np.sum(inconn)).squeeze().tolist()
+    embed = outembed + inembed
+    return embed
 
 def load_url_data_with_neighbouring_info(datafolder, urlvocab, onlytitle=False, addfeatures='connectivity'):
     '''
@@ -211,7 +220,9 @@ def load_url_data_with_neighbouring_info(datafolder, urlvocab, onlytitle=False, 
         elif addfeatures == 'node2vec':
             df_expand_label['addfeatures'] = df_expand_label['url'].apply(
                 lambda x: get_feature_node2vec(x, urlvocab))
-
+        elif addfeatures == 'bert':
+            df_expand_label['addfeatures'] = df_expand_label['url'].apply(
+                lambda x: get_feature_bert(x, urlvocab))
 
         return df_expand_label
 
