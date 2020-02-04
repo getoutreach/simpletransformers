@@ -66,7 +66,7 @@ s3 = get_resource()
 BUCKET = 'annotation-databricks-access-granted'
 
 
-def load_url_vocab(url_file_path):
+def load_url_vocab(url_file_path, node2vec_encode=False, bert_encode=False, bert_embedding_filename=None):
     # Load URL metadata
     jsonstring = get_json(s3, BUCKET, url_file_path)
     df_url = pd.io.json.json_normalize(jsonstring)
@@ -79,7 +79,8 @@ def load_url_vocab(url_file_path):
     # Remove surrounding white spaces in text fields
     df_url['header'] = df_url['header'].apply(lambda x: x.strip())
 
-    urlvocab = UrlVocab(df_url)
+    urlvocab = UrlVocab(df_url, node2vec_encode=node2vec_encode, bert_encode=bert_encode,
+                        bert_embedding_filename=bert_embedding_filename)
     return urlvocab
 
 

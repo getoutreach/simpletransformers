@@ -30,13 +30,13 @@ df_test = eval_df
 
 # Load URL vocab from S3
 file_path = os.path.join('jie-faq', 'faq', 'outreach_support_url_meta.json')
-urlvocab = load_url_vocab(file_path)
+urlvocab = load_url_vocab(file_path, bert_encode=True,
+                          bert_embedding_filename='./simpletransformers/data/data_from_bert/embedding')
 print('Number of recommendation candidate URLs: %d' % urlvocab.vocab_size)
 
 # Load dataset for training and testing from S3.
 datafolder = os.path.join('jie-faq', 'faq', 'outreach_msgs_w_support_url_random_split')
-df_train, df_dev, df_test = load_url_data_with_neighbouring_info(datafolder, urlvocab,
-                                                                 addfeatures='node2vec')
+df_train, df_dev, df_test = load_url_data_with_neighbouring_info(datafolder, urlvocab)
 print(f'Dataset size: train={len(df_train)}/{urlvocab.vocab_size}={len(df_train) / urlvocab.vocab_size}, ' +
       f'dev={len(df_dev)}/{urlvocab.vocab_size}={len(df_dev) / urlvocab.vocab_size}, ' +
       f'test={len(df_test)}/{urlvocab.vocab_size}={len(df_test) / urlvocab.vocab_size}')
