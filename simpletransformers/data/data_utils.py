@@ -233,7 +233,7 @@ def load_url_data_with_neighbouring_info(datafolder, urlvocab, onlytitle=False, 
             df_expand_label['addfeatures'] = df_expand_label['url'].apply(
                 lambda x: get_feature_bert(x, urlvocab))
         elif addfeatures == 'email_context':
-            df_expand_label['addfeatures'] = df_expand_label['ur'].apply(
+            df_expand_label['addfeatures'] = df_expand_label['url'].apply(
                 lambda x: get_feature_email_context(x, urlvocab))
         return df_expand_label
 
