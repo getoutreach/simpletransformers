@@ -8,3 +8,6 @@ from simpletransformers.classification.semantic_matching_classification_model im
 from simpletransformers.classification.classification_model_add_features import (
     ClassificationModelAddFeatures,
 )
+from simpletransformers.classification.classification_model_add_gcn import (
+    ClassificationModelWithGCN
+)

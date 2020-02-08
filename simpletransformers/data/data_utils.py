@@ -109,7 +109,7 @@ def load_url_data_email_only(datafolder, urlvocab):
     return df_train, df_dev, df_test
 
 
-def load_url_data_email_article_pair(datafolder, urlvocab, onlytitle=False):
+def load_url_data_email_article_pair(datafolder, urlvocab, onlytitle=False, include_url_id=False):
     '''
     Getting URL prediction datasets. "text_a" field contains input emails and "text_b" field contains the article
     associated with the candidate URL.
@@ -151,6 +151,11 @@ def load_url_data_email_article_pair(datafolder, urlvocab, onlytitle=False):
         else:
             df_expand_label['text_b'] = df_expand_label['url'].apply(
                 lambda x: urlvocab.get_title(x) + '. ' + urlvocab.get_text(x))
+
+        if include_url_id:
+            df_expand_label['url_id'] = df_expand_label['url'].apply(
+                lambda x: urlvocab.url2idx(x))
+
         return df_expand_label
 
     df_train = get_split(datafolder, 'train.csv')
@@ -175,7 +180,8 @@ def get_feature_email_context(url, urlvocab):
     return urlvocab.url2emailcontextembedding(url).tolist()
 
 
-def load_url_data_with_neighbouring_info(datafolder, urlvocab, onlytitle=False, addfeatures='connectivity'):
+def load_url_data_with_neighbouring_info(datafolder, urlvocab, onlytitle=False, addfeatures='connectivity',
+                                         include_url_id=False):
     '''
     Getting URL prediction datasets. "text_a" field contains input emails and "text_b" field contains the article
     associated with the candidate URL.
@@ -235,7 +241,13 @@ def load_url_data_with_neighbouring_info(datafolder, urlvocab, onlytitle=False, 
         elif addfeatures == 'email_context':
             df_expand_label['addfeatures'] = df_expand_label['url'].apply(
                 lambda x: get_feature_email_context(x, urlvocab))
+
+        if include_url_id:
+            df_expand_label['url_id'] = df_expand_label['url'].apply(
+                lambda x: urlvocab.url2idx(x))
+
         return df_expand_label
+
 
     df_train = get_split(datafolder, 'train.csv')
     df_dev = get_split(datafolder, 'dev.csv')
