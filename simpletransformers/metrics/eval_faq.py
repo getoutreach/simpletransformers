@@ -1,7 +1,6 @@
 from simpletransformers.metrics.ranking_metrics import MAP, MRR, NDCG, Prec, Recall, F1
 import numpy as np
 import sys
-import pdb
 
 
 def print_metrics(metrics, f=sys.stdout):
@@ -11,7 +10,6 @@ def print_metrics(metrics, f=sys.stdout):
 
 
 def faq_evaluate(model, df_eval_input):
-    pdb.set_trace()
     if 'text' in df_eval_input.columns:
         # This is evaluated as a 'classification' task
         predictions, raw_outputs = model.predict(df_eval_input['text'])
