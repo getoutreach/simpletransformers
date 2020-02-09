@@ -53,8 +53,9 @@ class BertForSequenceClassificationWithGCN(BertPreTrainedModel):
         nx_dg = nx.from_numpy_matrix(urlvocab.out_connectivity)
         self.g.from_networkx(nx_dg)
         self.g_features = torch.tensor(urlvocab.bert_embedding, dtype=torch.float)
-        if device is not None:
-            self.g_features = self.g_features.to(device)
+        # FIXME: this does not work for multiple GPUs, unsure for one GPU
+        # if device is not None:
+        #     self.g_features = self.g_features.to(device)
         self.gcn = Net(input_size=self.g_features.shape[1],
                        hidden_size=gcn_hidden_size,
                        output_size=gcn_output_size)

@@ -118,7 +118,7 @@ class ClassificationModelWithGCN:
                 config=self.config,
                 urlvocab=urlvocab,
                 weight=torch.Tensor(self.weight).to(self.device),
-                device=self.device
+                # device=self.device
                 **kwargs,
             )
         else:

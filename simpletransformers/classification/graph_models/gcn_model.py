@@ -5,6 +5,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from dgl import DGLGraph
 import networkx as nx
+import pdb
+
 
 gcn_msg = fn.copy_src(src='h', out='m')
 gcn_reduce = fn.sum(msg='m', out='h')
@@ -29,6 +31,7 @@ class GCN(nn.Module):
         self.apply_mod = NodeApplyModule(in_feats, out_feats, activation)
 
     def forward(self, g, feature):
+        pdb.set_trace()
         g.ndata['h'] = feature
         g.update_all(gcn_msg, gcn_reduce)
         g.apply_nodes(func=self.apply_mod)
