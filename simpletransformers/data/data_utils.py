@@ -180,7 +180,8 @@ def get_feature_email_context(url, urlvocab):
     return urlvocab.url2emailcontextembedding(url).tolist()
 
 
-def load_url_data_with_neighbouring_info(datafolder, urlvocab, onlytitle=False, addfeatures='connectivity',
+def load_url_data_with_neighbouring_info(datafolder, urlvocab, onlytitle=False,
+                                         addfeatures=None,
                                          include_url_id=False):
     '''
     Getting URL prediction datasets. "text_a" field contains input emails and "text_b" field contains the article

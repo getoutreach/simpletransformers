@@ -118,11 +118,12 @@ class ClassificationModelWithGCN:
                 config=self.config,
                 urlvocab=urlvocab,
                 weight=torch.Tensor(self.weight).to(self.device),
+                device=self.device
                 **kwargs,
             )
         else:
             self.model = model_class.from_pretrained(
-                model_name, config=self.config, urlvocab=urlvocab, **kwargs
+                model_name, config=self.config, urlvocab=urlvocab, device=self.device, **kwargs
             )
 
         self.results = {}
@@ -877,7 +878,7 @@ class ClassificationModelWithGCN:
         self._move_model_to_device()
 
         eval_examples = [
-            InputExample(i, text_a, text_b, 0, url_id)
+            InputExample(i, text_a, text_b, 0, url_id=url_id)
             for i, (text_a, text_b, url_id) in enumerate(to_predict)
         ]
         if args["sliding_window"]:

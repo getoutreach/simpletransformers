@@ -39,6 +39,7 @@ class BertForSequenceClassificationWithGCN(BertPreTrainedModel):
                  # additional_features_size,
                  urlvocab,
                  weight=None,
+                 device=None,
                  gcn_hidden_size=128,
                  gcn_output_size=128):
         super(BertForSequenceClassificationWithGCN, self).__init__(config)
@@ -51,7 +52,9 @@ class BertForSequenceClassificationWithGCN(BertPreTrainedModel):
         self.g = dgl.DGLGraph()
         nx_dg = nx.from_numpy_matrix(urlvocab.out_connectivity)
         self.g.from_networkx(nx_dg)
-        self.g_features = urlvocab.bert_embedding
+        self.g_features = torch.tensor(urlvocab.bert_embedding, dtype=torch.float)
+        if device is not None:
+            self.g_features = self.g_features.to(device)
         self.gcn = Net(input_size=self.g_features.shape[1],
                        hidden_size=gcn_hidden_size,
                        output_size=gcn_output_size)
