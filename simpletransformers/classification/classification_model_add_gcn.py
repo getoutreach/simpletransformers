@@ -54,6 +54,8 @@ from simpletransformers.metrics.record_metrics import write_progress_to_csv
 
 import wandb
 
+import pdb
+
 
 class ClassificationModelWithGCN:
     def __init__(
@@ -387,6 +389,8 @@ class ClassificationModelWithGCN:
                 batch = tuple(t.to(device) for t in batch)
 
                 inputs = self._get_inputs_dict(batch)
+                print(inputs['url_ids'].shape)
+                pdb.set_trace()
                 outputs = model(**inputs)
                 # model outputs are always tuple in pytorch-transformers (see doc)
                 loss = outputs[0]
