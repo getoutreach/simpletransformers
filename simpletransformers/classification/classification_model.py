@@ -1009,7 +1009,7 @@ class ClassificationModel:
                 eval_examples, mode=mode, no_cache=True)
         else:
             eval_dataset = self.load_and_cache_examples(
-                eval_examples, mode=mode, multi_label=multi_label, no_cache=True)
+                eval_examples, mode=mode, multi_label=multi_label, no_cache=False)
 
         eval_sampler = SequentialSampler(eval_dataset)
         eval_dataloader = DataLoader(
