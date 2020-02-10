@@ -5,6 +5,7 @@ wandb/
 **/cache_dir
 **/runs
 **/outputs
+tmp/
 
 # manual_test_scripts
 test_scripts/
@@ -134,3 +135,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# MacOS and IDE related
+.idea/
+**/.DS_Store
