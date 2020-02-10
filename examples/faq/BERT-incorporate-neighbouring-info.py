@@ -28,22 +28,22 @@ eval_df = pd.DataFrame(eval_data, columns=['text_a', 'text_b', 'reps_response_id
 df_dev = eval_df
 df_test = eval_df
 
-# Load URL vocab from S3
-file_path = os.path.join('jie-faq', 'faq', 'outreach_support_url_meta.json')
-urlvocab = load_url_vocab(file_path, bert_encode=True,
-                          bert_embedding_filename='./simpletransformers/data/data_from_bert/embedding')
-print('Number of recommendation candidate URLs: %d' % urlvocab.vocab_size)
-
-# Load dataset for training and testing from S3.
-datafolder = os.path.join('jie-faq', 'faq', 'outreach_msgs_w_support_url_random_split')
-df_train, df_dev, df_test = load_url_data_with_neighbouring_info(datafolder, urlvocab,
-                                                                 addfeatures='bert')
-print(f'Dataset size: train={len(df_train)}/{urlvocab.vocab_size}={len(df_train) / urlvocab.vocab_size}, ' +
-      f'dev={len(df_dev)}/{urlvocab.vocab_size}={len(df_dev) / urlvocab.vocab_size}, ' +
-      f'test={len(df_test)}/{urlvocab.vocab_size}={len(df_test) / urlvocab.vocab_size}')
+# # Load URL vocab from S3
+# file_path = os.path.join('jie-faq', 'faq', 'outreach_support_url_meta.json')
+# urlvocab = load_url_vocab(file_path, bert_encode=True,
+#                           bert_embedding_filename='./simpletransformers/data/data_from_bert/embedding')
+# print('Number of recommendation candidate URLs: %d' % urlvocab.vocab_size)
+#
+# # Load dataset for training and testing from S3.
+# datafolder = os.path.join('jie-faq', 'faq', 'outreach_msgs_w_support_url_random_split')
+# df_train, df_dev, df_test = load_url_data_with_neighbouring_info(datafolder, urlvocab,
+#                                                                  addfeatures='bert')
+# print(f'Dataset size: train={len(df_train)}/{urlvocab.vocab_size}={len(df_train) / urlvocab.vocab_size}, ' +
+#       f'dev={len(df_dev)}/{urlvocab.vocab_size}={len(df_dev) / urlvocab.vocab_size}, ' +
+#       f'test={len(df_test)}/{urlvocab.vocab_size}={len(df_test) / urlvocab.vocab_size}')
 
 train_args = {'learning_rate': 5e-5,
-              'reprocess_input_data': True,
+              # 'reprocess_input_data': True,
               'overwrite_output_dir': True,
               'overwrite_cache': True,
               'num_train_epochs': 10,
