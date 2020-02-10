@@ -5,6 +5,7 @@ import os
 import platform
 import json
 import pandas as pd
+import numpy as np
 from simpletransformers.data.url_vocab import UrlVocab
 
 
@@ -66,7 +67,12 @@ s3 = get_resource()
 BUCKET = 'annotation-databricks-access-granted'
 
 
-def load_url_vocab(url_file_path):
+def load_url_vocab(url_file_path,
+                   node2vec_encode=False,
+                   bert_encode=False,
+                   bert_encoding_filename=None,
+                   bert_encode_email_context=False,
+                   bert_encoding_email_filename=None):
     # Load URL metadata
     jsonstring = get_json(s3, BUCKET, url_file_path)
     df_url = pd.io.json.json_normalize(jsonstring)
@@ -79,7 +85,12 @@ def load_url_vocab(url_file_path):
     # Remove surrounding white spaces in text fields
     df_url['header'] = df_url['header'].apply(lambda x: x.strip())
 
-    urlvocab = UrlVocab(df_url)
+    urlvocab = UrlVocab(df_url,
+                        node2vec_encode=node2vec_encode,
+                        bert_encode=bert_encode,
+                        bert_encoding_filename=bert_encoding_filename,
+                        bert_encode_email_context=bert_encode_email_context,
+                        bert_encoding_email_filename=bert_encoding_email_filename)
     return urlvocab
 
 
@@ -98,7 +109,7 @@ def load_url_data_email_only(datafolder, urlvocab):
     return df_train, df_dev, df_test
 
 
-def load_url_data_email_article_pair(datafolder, urlvocab, onlytitle=False):
+def load_url_data_email_article_pair(datafolder, urlvocab, onlytitle=False, include_url_id=False):
     '''
     Getting URL prediction datasets. "text_a" field contains input emails and "text_b" field contains the article
     associated with the candidate URL.
@@ -140,6 +151,11 @@ def load_url_data_email_article_pair(datafolder, urlvocab, onlytitle=False):
         else:
             df_expand_label['text_b'] = df_expand_label['url'].apply(
                 lambda x: urlvocab.get_title(x) + '. ' + urlvocab.get_text(x))
+
+        if include_url_id:
+            df_expand_label['url_id'] = df_expand_label['url'].apply(
+                lambda x: urlvocab.url2idx(x))
+
         return df_expand_label
 
     df_train = get_split(datafolder, 'train.csv')
@@ -156,7 +172,17 @@ def get_feature_node2vec(url, urlvocab):
     return urlvocab.url2node2vec(url).tolist()
 
 
-def load_url_data_with_neighbouring_info(datafolder, urlvocab, onlytitle=False, addfeatures='connectivity'):
+def get_feature_bert(url, urlvocab):
+    return urlvocab.url2bert(url).tolist()
+
+
+def get_feature_email_context(url, urlvocab):
+    return urlvocab.url2emailcontextembedding(url).tolist()
+
+
+def load_url_data_with_neighbouring_info(datafolder, urlvocab, onlytitle=False,
+                                         addfeatures=None,
+                                         include_url_id=False):
     '''
     Getting URL prediction datasets. "text_a" field contains input emails and "text_b" field contains the article
     associated with the candidate URL.
@@ -202,7 +228,7 @@ def load_url_data_with_neighbouring_info(datafolder, urlvocab, onlytitle=False, 
             df_expand_label['text_b'] = df_expand_label['url'].apply(
                 lambda x: urlvocab.get_title(x) + '. ' + urlvocab.get_text(x))
 
-        # Get connectivity information as additional features
+        # Get other information as additional features
         # FIXME: another option is to load this URL-related data during model training
         if addfeatures == 'connectivity':
             df_expand_label['addfeatures'] = df_expand_label['url'].apply(
@@ -210,9 +236,19 @@ def load_url_data_with_neighbouring_info(datafolder, urlvocab, onlytitle=False, 
         elif addfeatures == 'node2vec':
             df_expand_label['addfeatures'] = df_expand_label['url'].apply(
                 lambda x: get_feature_node2vec(x, urlvocab))
+        elif addfeatures == 'bert':
+            df_expand_label['addfeatures'] = df_expand_label['url'].apply(
+                lambda x: get_feature_bert(x, urlvocab))
+        elif addfeatures == 'email_context':
+            df_expand_label['addfeatures'] = df_expand_label['url'].apply(
+                lambda x: get_feature_email_context(x, urlvocab))
 
+        if include_url_id:
+            df_expand_label['url_id'] = df_expand_label['url'].apply(
+                lambda x: urlvocab.url2idx(x))
 
         return df_expand_label
+
 
     df_train = get_split(datafolder, 'train.csv')
     df_dev = get_split(datafolder, 'dev.csv')

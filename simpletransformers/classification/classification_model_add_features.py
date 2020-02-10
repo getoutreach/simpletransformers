@@ -399,7 +399,7 @@ class ClassificationModelAddFeatures:
                 batch = tuple(t.to(device) for t in batch)
 
                 inputs = self._get_inputs_dict(batch)
-                outputs = model(**inputs)
+                outputs = model(dropout_addfeatures=True, **inputs)
                 # model outputs are always tuple in pytorch-transformers (see doc)
                 loss = outputs[0]
 
@@ -557,11 +557,11 @@ class ClassificationModelAddFeatures:
                 records = {'epoch': epoch_number,
                            'ckpt': "checkpoint-{}-epoch-{}".format(global_step, epoch_number)}
                 if eval_df is not None:
-                    eval_metrics, _, _ = faq_evaluate(self, eval_df)
+                    eval_metrics, _, _ = faq_evaluate(self, eval_df, mode='dev')
                     print_metrics(eval_metrics)
                     records.update({('dev-' + k): v for k, v in eval_metrics.items()})
                 if test_df is not None:
-                    test_metrics, _, _ = faq_evaluate(self, test_df)
+                    test_metrics, _, _ = faq_evaluate(self, test_df, mode='test')
                     print_metrics(test_metrics)
                     records.update({('test-' + k): v for k, v in test_metrics.items()})
                 write_progress_to_csv(output_dir, 'train_log.csv', metrics=records)
@@ -726,13 +726,15 @@ class ClassificationModelAddFeatures:
         return results, model_outputs, wrong
 
     def load_and_cache_examples(
-        self, examples, evaluate=False, no_cache=False, multi_label=False
+        self, examples, mode='train', no_cache=False, multi_label=False
     ):
         """
         Converts a list of InputExample objects to a TensorDataset containing InputFeatures. Caches the InputFeatures.
 
         Utility function for train() and eval() methods. Not intended to be used directly.
         """
+        assert mode in ["train", "dev", "test"]
+        evaluate = (mode != "train")
 
         process_count = self.args["process_count"]
 
@@ -747,13 +749,14 @@ class ClassificationModelAddFeatures:
         if not os.path.isdir(self.args["cache_dir"]):
             os.mkdir(self.args["cache_dir"])
 
-        mode = "dev" if evaluate else "train"
+        seqlen = args["max_seq_length"] if isinstance(args["max_seq_length"], int) else \
+            "_".join(map(str, args["max_seq_length"]))
         cached_features_file = os.path.join(
             args["cache_dir"],
-            "cached_{}_{}_{}_{}_{}".format(
+            "cached_{}_{}_len{}_nlabel{}_nexample{}".format(
                 mode,
                 args["model_type"],
-                args["max_seq_length"],
+                seqlen,
                 self.num_labels,
                 len(examples),
             ),
@@ -761,7 +764,7 @@ class ClassificationModelAddFeatures:
 
         if os.path.exists(cached_features_file) and (
             (not args["reprocess_input_data"] and not no_cache)
-            or (mode == "dev" and args["use_cached_eval_features"])
+            or (mode != "train" and args["use_cached_eval_features"])
         ):
             features = torch.load(cached_features_file)
             print(f"Features loaded from cache at {cached_features_file}")
@@ -871,7 +874,7 @@ class ClassificationModelAddFeatures:
         else:
             return {**{"mcc": mcc}, **extra_metrics}, wrong
 
-    def predict(self, to_predict, multi_label=False):
+    def predict(self, to_predict, multi_label=False, mode='dev'):
         """
         Performs predictions on a list of text.
 
@@ -895,12 +898,10 @@ class ClassificationModelAddFeatures:
         ]
         if args["sliding_window"]:
             eval_dataset, window_counts = self.load_and_cache_examples(
-                eval_examples, evaluate=True, no_cache=True
-            )
+                eval_examples, mode=mode, no_cache=True)
         else:
             eval_dataset = self.load_and_cache_examples(
-                eval_examples, evaluate=True, multi_label=multi_label, no_cache=True
-            )
+                eval_examples, mode=mode, multi_label=multi_label, no_cache=False)
 
         eval_sampler = SequentialSampler(eval_dataset)
         eval_dataloader = DataLoader(

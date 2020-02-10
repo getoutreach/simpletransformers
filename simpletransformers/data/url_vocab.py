@@ -1,9 +1,13 @@
 import os
 import json
+import torch
+import pickle
 import numpy as np
 import networkx as nx
 from node2vec import Node2Vec
 from node2vec.edges import HadamardEmbedder
+from transformers import BertConfig, BertTokenizer
+from transformers.modeling_bert import BertPreTrainedModel, BertModel
 
 
 CURR_PATH = os.path.split(os.path.abspath(__file__))[0]
@@ -14,7 +18,12 @@ NODE2VEC_EDGES_EMBEDDING_FILENAME = os.path.join(CURR_PATH, './data_from_node2ve
 
 class UrlVocab:
     """A vocabulary of entities (articles identifiable by URL) that are recommendation candidates."""
-    def __init__(self, df_url):
+    def __init__(self, df_url,
+                 node2vec_encode=False,
+                 bert_encode=False,
+                 bert_encoding_filename=None,
+                 bert_encode_email_context=False,
+                 bert_encoding_email_filename=None):
         self.df_url = df_url
         self.url_vocab_list = list(self.df_url['url'])
         self.vocab_size = len(self.url_vocab_list)
@@ -35,8 +44,24 @@ class UrlVocab:
         self.all_connectivity = self._find_all_connectivity()
 
         # Embed structural information
-        self.url_embedding, self.nav_url_embedding = self._node2vec_encode()
-        pass
+        self.url_node2vec_embedding, self.nav_url_node2vec_embedding = None, None
+        if node2vec_encode:
+            self.url_node2vec_embedding, self.nav_url_node2vec_embedding = self._node2vec_encode()
+
+        # Embed articles using BERT
+        self.bert_embedding = None   # The embedding of each article using BERT.
+        self.url_bert_embedding = None  # Neighbour nodes/articles' BERT embeddings, aggregated.
+        self.bert_encoding_filename = bert_encoding_filename
+        if bert_encode and bert_encoding_filename is not None:
+            self.bert_embedding = self._get_bert_encoding_of_url_article(self.bert_encoding_filename)
+            self.url_bert_embedding = self._bert_encoding_from_neighbours()
+
+        # Embed email context information using BERT
+        self.url_email_context_bert_embedding = None  # THe embedding of each URL's email contexts, aggregated.
+        self.bert_encoding_email_filename = bert_encoding_email_filename
+        if bert_encode_email_context and bert_encoding_email_filename is not None:
+            self.url_email_context_bert_embedding = self._get_bert_encoding_of_email_context(
+                    self.bert_encoding_email_filename)
 
     def _find_url_connectivity(self):
         """Find related entities (articles) through hyperlinks"""
@@ -137,7 +162,198 @@ class UrlVocab:
 
     def url2node2vec(self, url):
         if url in self.url_vocab_list:
-            return self.url_embedding[self.url_to_idx[url]]
+            return self.url_node2vec_embedding[self.url_to_idx[url]]
         if url in self.nav_url_list:
-            return self.nav_url_embedding[self.nav_url_to_idx[url]]
+            return self.nav_url_node2vec_embedding[self.nav_url_to_idx[url]]
         return None
+
+    def url2bert(self, url):
+        if url in self.url_vocab_list:
+            return self.url_bert_embedding[self.url_to_idx[url]]
+        return None
+
+    def url2emailcontextembedding(self, url):
+        if url in self.url_vocab_list:
+            return self.url_email_context_bert_embedding[self.url_to_idx[url]]
+        return None
+
+    def _bert_encoding_from_neighbours(self):
+        x = np.matmul(self.out_connectivity, self.bert_embedding)
+        y = np.sum(self.out_connectivity, axis=1, keepdims=True)
+        outembed = np.divide(x, y, out=np.zeros_like(x), where=y!=0)
+
+        x = np.matmul(self.in_connectivity, self.bert_embedding)
+        y = np.sum(self.in_connectivity, axis=1, keepdims=True)
+        inembed = np.divide(x, y, out=np.zeros_like(x), where=y!=0)
+
+        embed = np.concatenate([outembed, inembed], axis=1)
+        return embed
+
+    def _get_bert_encoding_of_url_article(self, filename):
+        if os.path.exists(filename):
+            print(f'Loading BERT encoding from {filename}.')
+            with open(filename, 'rb') as f:
+                bert_embedding = pickle.load(f)
+                assert bert_embedding.shape[0] == self.vocab_size
+        else:
+            print(f'BERT encoding not found, generating.')
+            bert_embedding = self._bert_encode_article()
+            with open(filename, 'wb') as f:
+                pickle.dump(bert_embedding, f, protocol=pickle.HIGHEST_PROTOCOL)
+                print(f'Saved BERT encoding to {filename}')
+        return bert_embedding
+
+    def _bert_encode_article(self,
+                          max_seq_length=128,
+                          sequence_a_segment_id=0,
+                          sequence_b_segment_id=1,
+                          cls_token_segment_id=1,
+                          pad_token_segment_id=0,
+                          mask_padding_with_zero=True):
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
+        bert_config = BertConfig.from_pretrained('bert-base-uncased')
+        model = BertModel(bert_config)
+
+        all_input_ids, all_input_mask, all_segment_ids = [], [], []
+        for header, article in zip(self.df_url['header'], self.df_url['article']):
+            text = header + '. ' + article
+            tokens = tokenizer.tokenize(text)
+            special_tokens_count = 2
+            if len(tokens) > max_seq_length - special_tokens_count:
+                tokens = tokens[: (max_seq_length - special_tokens_count)]
+            segment_ids = [sequence_a_segment_id] * len(tokens)
+            tokens = [tokenizer.cls_token] + tokens + [tokenizer.sep_token]
+            segment_ids = [cls_token_segment_id] + segment_ids + [sequence_a_segment_id]
+            input_ids = tokenizer.convert_tokens_to_ids(tokens)
+            input_mask = [1 if mask_padding_with_zero else 0] * len(input_ids)
+
+            # Padding
+            padding_length = max_seq_length - len(input_ids)
+            pad_token = tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[0]
+            input_ids = input_ids + ([pad_token] * padding_length)
+            input_mask = input_mask + [0] * padding_length
+            segment_ids = segment_ids + ([pad_token_segment_id] * padding_length)
+
+            assert len(input_ids) == max_seq_length
+            assert len(input_mask) == max_seq_length
+            assert len(segment_ids) == max_seq_length
+            all_input_ids.append(input_ids)
+            all_input_mask.append(input_mask)
+            all_segment_ids.append(segment_ids)
+
+        all_input_ids = torch.tensor(all_input_ids)
+        all_input_mask = torch.tensor(all_input_mask)
+        all_segment_ids = torch.tensor(all_segment_ids)
+
+        model.eval()
+        outputs = model(all_input_ids,
+                        attention_mask=all_input_mask,
+                        token_type_ids=all_segment_ids)
+        embedding = outputs[1].data.numpy()
+        del model
+        return embedding
+
+    def _get_bert_encoding_of_email_context(self, filename):
+        if os.path.exists(filename):
+            print(f'Loading email context BERT encoding from {filename}.')
+            with open(filename, 'rb') as f:
+                bert_embedding = pickle.load(f)
+                assert bert_embedding.shape[0] == self.vocab_size
+        else:
+            print(f'Email context BERT encoding not found, generating.')
+            bert_embedding = self._bert_encode_email_context()
+            with open(filename, 'wb') as f:
+                pickle.dump(bert_embedding, f, protocol=pickle.HIGHEST_PROTOCOL)
+                print(f'Saved email context BERT encoding to {filename}')
+        return bert_embedding
+
+    def _bert_encode(self, model, texts, tokenizer,
+                     max_seq_length=128,
+                     sequence_a_segment_id=0,
+                     sequence_b_segment_id=1,
+                     cls_token_segment_id=1,
+                     pad_token_segment_id=0,
+                     mask_padding_with_zero=True,
+                     filter_func=None):
+        all_input_ids, all_input_mask, all_segment_ids = [], [], []
+        for text in texts:
+            tokens = tokenizer.tokenize(text)
+            if filter_func(tokens):
+                continue
+            special_tokens_count = 2
+            if len(tokens) > max_seq_length - special_tokens_count:
+                tokens = tokens[: (max_seq_length - special_tokens_count)]
+            segment_ids = [sequence_a_segment_id] * len(tokens)
+            tokens = [tokenizer.cls_token] + tokens + [tokenizer.sep_token]
+            segment_ids = [cls_token_segment_id] + segment_ids + [sequence_a_segment_id]
+            input_ids = tokenizer.convert_tokens_to_ids(tokens)
+            input_mask = [1 if mask_padding_with_zero else 0] * len(input_ids)
+
+            # Padding
+            padding_length = max_seq_length - len(input_ids)
+            pad_token = tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[0]
+            input_ids = input_ids + ([pad_token] * padding_length)
+            input_mask = input_mask + [0] * padding_length
+            segment_ids = segment_ids + ([pad_token_segment_id] * padding_length)
+
+            assert len(input_ids) == max_seq_length
+            assert len(input_mask) == max_seq_length
+            assert len(segment_ids) == max_seq_length
+            all_input_ids.append(input_ids)
+            all_input_mask.append(input_mask)
+            all_segment_ids.append(segment_ids)
+
+        if all_input_ids and all_input_mask and all_segment_ids:
+            all_input_ids = torch.tensor(all_input_ids)
+            all_input_mask = torch.tensor(all_input_mask)
+            all_segment_ids = torch.tensor(all_segment_ids)
+
+            model.eval()
+            outputs = model(all_input_ids,
+                            attention_mask=all_input_mask,
+                            token_type_ids=all_segment_ids)
+            embedding = outputs[1].data.numpy()
+        else:
+            return np.zeros([1,model.config.hidden_size], dtype=float)
+
+        return embedding
+
+
+    def _bert_encode_email_context(self,
+                                   max_seq_length=128,
+                                   sequence_a_segment_id=0,
+                                   sequence_b_segment_id=1,
+                                   cls_token_segment_id=1,
+                                   pad_token_segment_id=0,
+                                   mask_padding_with_zero=True):
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
+        bert_config = BertConfig.from_pretrained('bert-base-uncased')
+        model = BertModel(bert_config)
+
+        def too_many_stopwords(tokenlist):
+            stopwords = ['here', '.', ',', ':', 'article', 'a', 'an', 'this', 'link',
+                         'more', 'info', 'support', 'how', 'to']
+            filtered = list(filter(lambda x: x not in stopwords, tokenlist))
+            if len(filtered) > 2:
+                return False
+            return True
+
+        all_embeddings = []
+        for context_sents in self.df_url['context']:
+            context_sents = list(context_sents)
+            if context_sents:
+                embedding = self._bert_encode(model, list(context_sents), tokenizer,
+                                          max_seq_length=max_seq_length,
+                                          sequence_a_segment_id=sequence_a_segment_id,
+                                          sequence_b_segment_id=sequence_b_segment_id,
+                                          cls_token_segment_id=cls_token_segment_id,
+                                          pad_token_segment_id=pad_token_segment_id,
+                                          mask_padding_with_zero=mask_padding_with_zero,
+                                          filter_func=too_many_stopwords)
+                all_embeddings.append(np.mean(embedding, axis=0))
+            else:
+                embedding = np.zeros(model.config.hidden_size, dtype=float)
+                all_embeddings.append(np.sum(embedding, axis=0))
+
+        del model
+        return np.stack(all_embeddings)

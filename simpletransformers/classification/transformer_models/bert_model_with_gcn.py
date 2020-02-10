@@ -2,9 +2,12 @@ from transformers.modeling_bert import BertPreTrainedModel, BertModel
 import torch
 import torch.nn as nn
 from torch.nn import CrossEntropyLoss, MSELoss
+from simpletransformers.classification.graph_models.gcn_model import Net
+import networkx as nx
+import dgl
 
 
-class BertForSequenceClassificationAddFeatures(BertPreTrainedModel):
+class BertForSequenceClassificationWithGCN(BertPreTrainedModel):
     r"""
         **labels**: (`optional`) ``torch.LongTensor`` of shape ``(batch_size,)``:
             Labels for computing the sequence classification/regression loss.
@@ -32,13 +35,33 @@ class BertForSequenceClassificationAddFeatures(BertPreTrainedModel):
         loss, logits = outputs[:2]
     """  # noqa: ignore flake8"
 
-    def __init__(self, config, additional_features_size, weight=None):
-        super(BertForSequenceClassificationAddFeatures, self).__init__(config)
+    def __init__(self, config,
+                 # additional_features_size,
+                 urlvocab,
+                 weight=None,
+                 device=None,
+                 gcn_hidden_size=128,
+                 gcn_output_size=128):
+        super(BertForSequenceClassificationWithGCN, self).__init__(config)
         self.num_labels = config.num_labels
 
+        # BERT model
         self.bert = BertModel(config)
+
+        # GCN model
+        self.g = dgl.DGLGraph()
+        nx_dg = nx.from_numpy_matrix(urlvocab.out_connectivity)
+        self.g.from_networkx(nx_dg)
+        self.g_features = torch.tensor(urlvocab.bert_embedding, dtype=torch.float)
+        # FIXME: this does not work for multiple GPUs, unsure for one GPU
+        # if device is not None:
+        #     self.g_features = self.g_features.to(device)
+        self.gcn = Net(input_size=self.g_features.shape[1],
+                       hidden_size=gcn_hidden_size,
+                       output_size=gcn_output_size)
+
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.classifier = nn.Linear(config.hidden_size + additional_features_size, self.config.num_labels)
+        self.classifier = nn.Linear(config.hidden_size + gcn_output_size, self.config.num_labels)
         self.weight = weight
 
         self.init_weights()
@@ -52,8 +75,8 @@ class BertForSequenceClassificationAddFeatures(BertPreTrainedModel):
         head_mask=None,
         inputs_embeds=None,
         labels=None,
-        addfeatures=None,
-        dropout_addfeatures=False
+        url_ids=None,
+        dropout_addfeatures=False,
     ):
 
         outputs = self.bert(
@@ -65,13 +88,19 @@ class BertForSequenceClassificationAddFeatures(BertPreTrainedModel):
         )
         # Complains if input_embeds is kept
 
+        gcn_encodings = self.gcn(
+            self.g,
+            self.g_features,
+        )
+        node_encoding = gcn_encodings[url_ids]
+
         pooled_output = outputs[1]
         if dropout_addfeatures:
-            pooled_output = torch.cat([pooled_output, addfeatures], dim=1)
+            pooled_output = torch.cat([pooled_output, node_encoding], dim=1)
             pooled_output = self.dropout(pooled_output)
         else:
             pooled_output = self.dropout(pooled_output)
-            pooled_output = torch.cat([pooled_output, addfeatures], dim=1)
+            pooled_output = torch.cat([pooled_output, node_encoding], dim=1)
 
         logits = self.classifier(pooled_output)
 

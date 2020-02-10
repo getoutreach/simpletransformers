@@ -35,20 +35,6 @@ from transformers import (
     WEIGHTS_NAME,
     BertConfig,
     BertTokenizer,
-    XLNetConfig,
-    XLNetTokenizer,
-    XLMConfig,
-    XLMTokenizer,
-    RobertaConfig,
-    RobertaTokenizer,
-    DistilBertConfig,
-    DistilBertTokenizer,
-    AlbertConfig,
-    AlbertTokenizer,
-    CamembertConfig,
-    CamembertTokenizer,
-    XLMRobertaConfig,
-    XLMRobertaTokenizer,
 )
 
 from simpletransformers.classification.classification_utils import (
@@ -56,30 +42,10 @@ from simpletransformers.classification.classification_utils import (
     convert_examples_to_features,
 )
 
-from simpletransformers.classification.transformer_models.bert_model import (
-    BertForSequenceClassification,
+from simpletransformers.classification.transformer_models.bert_model_with_gcn import (
+    BertForSequenceClassificationWithGCN,
 )
-from simpletransformers.classification.transformer_models.roberta_model import (
-    RobertaForSequenceClassification,
-)
-from simpletransformers.classification.transformer_models.xlm_model import (
-    XLMForSequenceClassification,
-)
-from simpletransformers.classification.transformer_models.xlnet_model import (
-    XLNetForSequenceClassification,
-)
-from simpletransformers.classification.transformer_models.distilbert_model import (
-    DistilBertForSequenceClassification,
-)
-from simpletransformers.classification.transformer_models.albert_model import (
-    AlbertForSequenceClassification,
-)
-from simpletransformers.classification.transformer_models.camembert_model import (
-    CamembertForSequenceClassification,
-)
-from simpletransformers.classification.transformer_models.xlm_roberta_model import (
-    XLMRobertaForSequenceClassification,
-)
+
 
 from simpletransformers.config.global_args import global_args
 
@@ -89,11 +55,12 @@ from simpletransformers.metrics.record_metrics import write_progress_to_csv
 import wandb
 
 
-class ClassificationModel:
+class ClassificationModelWithGCN:
     def __init__(
         self,
         model_type,
         model_name,
+        urlvocab,
         num_labels=None,
         weight=None,
         args=None,
@@ -117,30 +84,7 @@ class ClassificationModel:
         """  # noqa: ignore flake8"
 
         MODEL_CLASSES = {
-            "bert": (BertConfig, BertForSequenceClassification, BertTokenizer),
-            "xlnet": (XLNetConfig, XLNetForSequenceClassification, XLNetTokenizer),
-            "xlm": (XLMConfig, XLMForSequenceClassification, XLMTokenizer),
-            "roberta": (
-                RobertaConfig,
-                RobertaForSequenceClassification,
-                RobertaTokenizer,
-            ),
-            "distilbert": (
-                DistilBertConfig,
-                DistilBertForSequenceClassification,
-                DistilBertTokenizer,
-            ),
-            "albert": (AlbertConfig, AlbertForSequenceClassification, AlbertTokenizer),
-            "camembert": (
-                CamembertConfig,
-                CamembertForSequenceClassification,
-                CamembertTokenizer,
-            ),
-            "xlmroberta": (
-                XLMRobertaConfig,
-                XLMRobertaForSequenceClassification,
-                XLMRobertaTokenizer,
-            ),
+            "bert": (BertConfig, BertForSequenceClassificationWithGCN, BertTokenizer),
         }
 
         config_class, model_class, tokenizer_class = MODEL_CLASSES[model_type]
@@ -169,16 +113,18 @@ class ClassificationModel:
             self.device = "cpu"
 
         if self.weight:
-
             self.model = model_class.from_pretrained(
                 model_name,
                 config=self.config,
+                urlvocab=urlvocab,
                 weight=torch.Tensor(self.weight).to(self.device),
+                # device=self.device
                 **kwargs,
             )
         else:
             self.model = model_class.from_pretrained(
-                model_name, config=self.config, **kwargs
+                model_name, config=self.config, urlvocab=urlvocab, # device=self.device,
+                **kwargs
             )
 
         self.results = {}
@@ -204,23 +150,6 @@ class ClassificationModel:
 
         self.args["model_name"] = model_name
         self.args["model_type"] = model_type
-
-        if model_type in ["camembert", "xlmroberta"]:
-            warnings.warn(
-                f"use_multiprocessing automatically disabled as {model_type}"
-                " fails when using multiprocessing for feature conversion."
-            )
-            self.args["use_multiprocessing"] = False
-
-        self.args["model_name"] = model_name
-        self.args["model_type"] = model_type
-
-        if model_type in ["camembert", "xlmroberta"]:
-            warnings.warn(
-                f"use_multiprocessing automatically disabled as {model_type}"
-                " fails when using multiprocessing for feature conversion."
-            )
-            self.args["use_multiprocessing"] = False
 
     def train_model(
         self,
@@ -277,30 +206,13 @@ class ClassificationModel:
 
         self._move_model_to_device()
 
-        if "text" in train_df.columns and "labels" in train_df.columns:
-            train_examples = [
-                InputExample(i, text, None, label)
-                for i, (text, label) in enumerate(
-                    zip(train_df["text"], train_df["labels"])
-                )
-            ]
-        elif "text_a" in train_df.columns and "text_b" in train_df.columns:
-            train_examples = [
-                InputExample(i, text_a, text_b, label)
-                for i, (text_a, text_b, label) in enumerate(
-                    zip(train_df["text_a"], train_df["text_b"], train_df["labels"])
-                )
-            ]
-        else:
-            warnings.warn(
-                "Dataframe headers not specified. Falling back to using column 0 as text and column 1 as labels."
+        assert "text_a" in train_df.columns and "text_b" in train_df.columns and 'url_id' in train_df.columns
+        train_examples = [
+            InputExample(i, text_a, text_b, label, url_id=url_id)
+            for i, (text_a, text_b, label, url_id) in enumerate(
+                zip(train_df["text_a"], train_df["text_b"], train_df["labels"], train_df["url_id"])
             )
-            train_examples = [
-                InputExample(i, text, None, label)
-                for i, (text, label) in enumerate(
-                    zip(train_df.iloc[:, 0], train_df.iloc[:, 1])
-                )
-            ]
+        ]
 
         train_dataset = self.load_and_cache_examples(train_examples)
 
@@ -634,11 +546,11 @@ class ClassificationModel:
                 records = {'epoch': epoch_number,
                            'ckpt': "checkpoint-{}-epoch-{}".format(global_step, epoch_number)}
                 if eval_df is not None:
-                    eval_metrics, _, _ = faq_evaluate(self, eval_df)
+                    eval_metrics, _, _ = faq_evaluate(self, eval_df, mode='dev')
                     print_metrics(eval_metrics)
                     records.update({('dev-' + k): v for k, v in eval_metrics.items()})
                 if test_df is not None:
-                    test_metrics, _, _ = faq_evaluate(self, test_df)
+                    test_metrics, _, _ = faq_evaluate(self, test_df, mode='test')
                     print_metrics(test_metrics)
                     records.update({('test-' + k): v for k, v in test_metrics.items()})
                 write_progress_to_csv(output_dir, 'train_log.csv', metrics=records)
@@ -698,37 +610,18 @@ class ClassificationModel:
 
         results = {}
 
-        if "text" in eval_df.columns and "labels" in eval_df.columns:
-            eval_examples = [
-                InputExample(i, text, None, label)
-                for i, (text, label) in enumerate(
-                    zip(eval_df["text"], eval_df["labels"])
-                )
-            ]
-        elif "text_a" in eval_df.columns and "text_b" in eval_df.columns:
-            eval_examples = [
-                InputExample(i, text_a, text_b, label)
-                for i, (text_a, text_b, label) in enumerate(
-                    zip(eval_df["text_a"], eval_df["text_b"], eval_df["labels"])
-                )
-            ]
-        else:
-            warnings.warn(
-                "Dataframe headers not specified. Falling back to using column 0 as text and column 1 as labels."
+        assert "text_a" in eval_df.columns and "text_b" in eval_df.columns and "url_id" in eval_df.columns
+        eval_examples = [
+            InputExample(i, text_a, text_b, label, url_id)
+            for i, (text_a, text_b, label, url_id) in enumerate(
+                zip(eval_df["text_a"], eval_df["text_b"], eval_df["labels"], eval_df["url_id"])
             )
-            eval_examples = [
-                InputExample(i, text, None, label)
-                for i, (text, label) in enumerate(
-                    zip(eval_df.iloc[:, 0], eval_df.iloc[:, 1])
-                )
-            ]
+        ]
 
         if args["sliding_window"]:
-            eval_dataset, window_counts = self.load_and_cache_examples(
-                eval_examples, evaluate=True
-            )
+            eval_dataset, window_counts = self.load_and_cache_examples(eval_examples, mode=mode)
         else:
-            eval_dataset = self.load_and_cache_examples(eval_examples, evaluate=True)
+            eval_dataset = self.load_and_cache_examples(eval_examples, mode=mode)
         if not os.path.exists(eval_output_dir):
             os.makedirs(eval_output_dir)
 
@@ -898,12 +791,9 @@ class ClassificationModel:
             features = [feature for feature_set in features for feature in feature_set]
 
         all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
-        all_input_mask = torch.tensor(
-            [f.input_mask for f in features], dtype=torch.long
-        )
-        all_segment_ids = torch.tensor(
-            [f.segment_ids for f in features], dtype=torch.long
-        )
+        all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
+        all_segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
+        all_url_ids = torch.tensor([f.url_id for f in features], dtype=torch.long)
 
         if output_mode == "classification":
             all_label_ids = torch.tensor(
@@ -915,7 +805,7 @@ class ClassificationModel:
             )
 
         dataset = TensorDataset(
-            all_input_ids, all_input_mask, all_segment_ids, all_label_ids
+            all_input_ids, all_input_mask, all_segment_ids, all_label_ids, all_url_ids
         )
 
         if args["sliding_window"] and evaluate:
@@ -989,21 +879,10 @@ class ClassificationModel:
 
         self._move_model_to_device()
 
-        if multi_label:
-            eval_examples = [
-                InputExample(i, text, None, [0 for i in range(self.num_labels)])
-                for i, text in enumerate(to_predict)
-            ]
-        else:
-            if isinstance(to_predict[0], list):
-                eval_examples = [
-                    InputExample(i, text[0], text[1], 0)
-                    for i, text in enumerate(to_predict)
-                ]
-            else:
-                eval_examples = [
-                    InputExample(i, text, None, 0) for i, text in enumerate(to_predict)
-                ]
+        eval_examples = [
+            InputExample(i, text_a, text_b, 0, url_id=url_id)
+            for i, (text_a, text_b, url_id) in enumerate(to_predict)
+        ]
         if args["sliding_window"]:
             eval_dataset, window_counts = self.load_and_cache_examples(
                 eval_examples, mode=mode, no_cache=True)
@@ -1105,7 +984,7 @@ class ClassificationModel:
         self.model.to(self.device)
 
     def _get_inputs_dict(self, batch):
-        inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
+        inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3], "url_ids": batch[4]}
 
         # XLM, DistilBERT and RoBERTa don't use segment_ids
         if self.args["model_type"] != "distilbert":

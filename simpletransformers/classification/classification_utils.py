@@ -34,7 +34,7 @@ csv.field_size_limit(2147483647)
 class InputExample(object):
     """A single training/test example for simple sequence classification."""
 
-    def __init__(self, guid, text_a, text_b=None, label=None, addfeatures=None):
+    def __init__(self, guid, text_a, text_b=None, label=None, addfeatures=None, url_id=None):
         """
         Constructs a InputExample.
 
@@ -53,17 +53,19 @@ class InputExample(object):
         self.text_b = text_b
         self.label = label
         self.addfeatures = addfeatures
+        self.url_id = url_id
 
 
 class InputFeatures(object):
     """A single set of features of data."""
 
-    def __init__(self, input_ids, input_mask, segment_ids, label_id, addfeatures):
+    def __init__(self, input_ids, input_mask, segment_ids, label_id, addfeatures, url_id):
         self.input_ids = input_ids
         self.input_mask = input_mask
         self.segment_ids = segment_ids
         self.label_id = label_id
         self.addfeatures = addfeatures
+        self.url_id = url_id
 
 
 def convert_example_to_feature(
@@ -191,6 +193,7 @@ def convert_example_to_feature(
         segment_ids=segment_ids,
         label_id=example.label,
         addfeatures=example.addfeatures,
+        url_id=example.url_id,
     )
 
 
@@ -394,6 +397,8 @@ def convert_examples_to_features(
                         disable=silent,
                     )
                 )
+                p.close()
+                p.join()
     else:
         if sliding_window:
             print("sliding_window enabled")
