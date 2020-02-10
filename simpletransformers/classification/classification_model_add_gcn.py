@@ -123,7 +123,8 @@ class ClassificationModelWithGCN:
             )
         else:
             self.model = model_class.from_pretrained(
-                model_name, config=self.config, urlvocab=urlvocab, device=self.device, **kwargs
+                model_name, config=self.config, urlvocab=urlvocab, # device=self.device,
+                **kwargs
             )
 
         self.results = {}
