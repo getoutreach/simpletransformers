@@ -35,4 +35,5 @@ global_args = {
     "silent": False,
     "wandb_project": None,
     "wandb_kwargs": {},
+    "dropout_addfeatures": False,
 }

@@ -49,6 +49,11 @@ df_train = df_train[: urlvocab.vocab_size * 1]
 df_dev = df_dev[: urlvocab.vocab_size * 1]
 df_test = df_test[: urlvocab.vocab_size * 1]
 
+# FIXME: Note that DataParallel is not currently supported by DQL. See the following issues:
+# Training GCN on multiple GPUs #838: https://github.com/dmlc/dgl/issues/838
+# When will multi-gpu be supported? #410: https://github.com/dmlc/dgl/issues/410 and
+# This discussion: https://discuss.dgl.ai/t/how-to-combine-dgl-with-torch-nn-dataparallel/137
+
 train_args = {'learning_rate': 5e-5,
               'reprocess_input_data': True,
               'overwrite_output_dir': True,

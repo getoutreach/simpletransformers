@@ -399,7 +399,7 @@ class ClassificationModelAddFeatures:
                 batch = tuple(t.to(device) for t in batch)
 
                 inputs = self._get_inputs_dict(batch)
-                outputs = model(dropout_addfeatures=True, **inputs)
+                outputs = model(dropout_addfeatures=args["dropout_addfeatures"], **inputs)
                 # model outputs are always tuple in pytorch-transformers (see doc)
                 loss = outputs[0]
 
