@@ -71,6 +71,7 @@ train_args = {'learning_rate': 5e-5,
               'silent': True,
               'faq_evaluate_during_training': True,
               'additional_features_size': 3,
+              'dropout_addfeatures': True,
               }
 model = ClassificationModelWithGCN(
     'bert', 'bert-base-uncased', urlvocab, num_labels=2, use_cuda=False, args=train_args)
