@@ -726,7 +726,7 @@ class ClassificationModelAddFeatures:
         return results, model_outputs, wrong
 
     def load_and_cache_examples(
-        self, examples, mode='train', no_cache=False, multi_label=False
+        self, examples, mode='train', evaluate=False, no_cache=False, multi_label=False
     ):
         """
         Converts a list of InputExample objects to a TensorDataset containing InputFeatures. Caches the InputFeatures.
